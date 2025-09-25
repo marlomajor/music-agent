@@ -1,5 +1,6 @@
 # Song Agent – Sing to Sheet Music
 
+
 A browser-based AI demo where you can hum a short melody and immediately get sleek, enterprise-style feedback:
 
 - Real-time level metering while you record so you know the mic is live.
@@ -12,12 +13,14 @@ This project demonstrates how an agent can coordinate live audio analysis, symbo
 
 ## Features
 
+
 - **Live audio capture** using the Web Audio API with built-in auto stop after ~12 seconds.
 - **Custom autocorrelation pitch detection** to map dominant frequencies to MIDI notes.
 - **Sheet music rendering** with VexFlow, quantized as quarter notes for an easy-to-read staff.
 - **Playback** of the detected melody using Tone.js plus an audio preview of the captured clip.
 - **LLM explanation** via OpenAI's Chat Completions API (with an offline heuristic fallback when no key is supplied).
 - **Single-command testing** with Node's native test runner to verify pitch utilities and the heuristic summarizer.
+
 
 ## Prerequisites
 
@@ -26,7 +29,9 @@ This project demonstrates how an agent can coordinate live audio analysis, symbo
 
 ## Quick start
 
+
 1. Install dependencies (none are required, but this generates a fresh `package-lock.json` and keeps npm happy):
+
    ```bash
    npm install
    ```
@@ -35,6 +40,7 @@ This project demonstrates how an agent can coordinate live audio analysis, symbo
    npm start
    ```
    The app will be available at [http://localhost:3000](http://localhost:3000). You can change the port by setting the `PORT` environment variable before running the command.
+
 3. Visit the URL in your browser and allow microphone access when prompted. You should see the level meter react immediately when audio is flowing.
 
 ## Usage
