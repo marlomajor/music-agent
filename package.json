@@ -1,0 +1,19 @@
+{
+  "name": "song-agent-demo",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Song Agent browser demo that records audio, detects pitch, renders sheet music, and provides LLM insights.",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "keywords": [
+    "music",
+    "pitch-detection",
+    "vexflow",
+    "tonejs",
+    "demo"
+  ],
+  "license": "MIT"
+}
