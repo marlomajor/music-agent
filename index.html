@@ -4,77 +4,90 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Song Agent – Sing to Sheet Music</title>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <header class="header">
-      <h1>Song Agent</h1>
-      <p class="tagline">Sing or hum, get instant sheet music and musical insights.</p>
-    </header>
+    <div class="app-shell">
+      <header class="app-header">
+        <div>
+          <p class="eyebrow">Song Agent</p>
+          <h1>Sing to Sheet Music</h1>
+          <p class="subtitle">Capture a melody, see the notes, and get instant musical insights.</p>
+        </div>
+        <div class="status-pill" aria-live="polite">
+          <span id="recordingIndicator" class="status-dot"></span>
+          <span id="statusText">Idle. Ready when you are.</span>
+        </div>
+      </header>
 
-    <main class="layout">
-      <section class="controls">
-        <div class="card">
-          <h2>Record</h2>
-          <p>
-            Capture a 5–10 second snippet of your melody. The agent will detect the
-            dominant pitch every half second and simplify it into a monophonic line.
+      <main class="grid">
+        <section class="card card--primary">
+          <header class="card__header">
+            <h2>Capture</h2>
+            <span id="timer" class="timer">00:00</span>
+          </header>
+          <p class="card__body">
+            Use your laptop mic to record up to ten seconds. We detect the dominant pitch every 200ms and track a clean melody line.
           </p>
-          <div class="button-row">
-            <button id="recordButton" class="primary">Record</button>
-            <button id="stopButton" class="secondary" disabled>Stop</button>
+          <div class="controls">
+            <button id="recordButton" class="btn btn--accent">Record</button>
+            <button id="stopButton" class="btn" disabled>Stop</button>
+            <button id="clearButton" class="btn btn--ghost">Reset</button>
           </div>
-          <p id="status" class="status">Ready to record.</p>
-        </div>
+          <div class="level-meter" aria-hidden="true">
+            <div id="levelBar" class="level-meter__bar"></div>
+          </div>
+          <audio id="recordedAudio" class="audio-preview" controls hidden></audio>
+        </section>
 
-        <div class="card">
-          <h2>LLM Explanation</h2>
-          <p>
-            Provide an OpenAI API key (optional). Without a key the app will use a
-            local heuristic to generate a mock explanation.
-          </p>
-          <label class="label" for="apiKey">OpenAI API Key</label>
-          <input id="apiKey" type="password" placeholder="sk-..." />
-          <button id="analyzeButton" class="primary" disabled>Analyze Melody</button>
-        </div>
+        <section class="card">
+          <header class="card__header">
+            <h2>Detected Notes</h2>
+          </header>
+          <div id="noteList" class="note-chips" aria-live="polite">
+            <p class="empty-state">Record to see the melody evolve in real time.</p>
+          </div>
+        </section>
 
-        <div class="card">
-          <h2>Playback</h2>
-          <p>Preview the detected melody rendered with Tone.js.</p>
-          <button id="playButton" class="primary" disabled>Play Melody</button>
-        </div>
-      </section>
-
-      <section class="results">
-        <div class="card">
-          <h2>Detected Notes</h2>
-          <p id="noteList" class="note-list">Record to see detected notes.</p>
-        </div>
-
-        <div class="card">
-          <h2>Sheet Music</h2>
+        <section class="card card--wide">
+          <header class="card__header">
+            <h2>Sheet Music</h2>
+          </header>
           <div id="sheetContainer" class="sheet-container">
             <svg id="sheet" role="img" aria-label="Rendered sheet music"></svg>
           </div>
-        </div>
+        </section>
 
-        <div class="card">
-          <h2>LLM Output</h2>
+        <section class="card">
+          <header class="card__header">
+            <h2>Playback</h2>
+          </header>
+          <p class="card__body">Preview the detected melody rendered with Tone.js.</p>
+          <button id="playButton" class="btn btn--accent" disabled>Play Melody</button>
+        </section>
+
+        <section class="card card--tall">
+          <header class="card__header">
+            <h2>LLM Explanation</h2>
+          </header>
+          <label class="label" for="apiKey">OpenAI API Key (optional)</label>
+          <input id="apiKey" class="input" type="password" placeholder="sk-..." autocomplete="off" />
+          <button id="analyzeButton" class="btn btn--accent" disabled>Analyze Melody</button>
           <pre id="llmJson" class="json-output">{"status": "Waiting for analysis"}</pre>
-          <p id="llmExplanation" class="llm-explanation">
-            The explanation will appear here after analysis.
-          </p>
-        </div>
-      </section>
-    </main>
+          <p id="llmExplanation" class="llm-explanation">Add a short melody to receive a key, chords, and style guidance.</p>
+        </section>
+      </main>
 
-    <footer class="footer">
-      <p>
-        Built with Web Audio, Pitchy, VexFlow, Tone.js, and an LLM to showcase a
-        tool-using music agent.
-      </p>
-    </footer>
+      <footer class="app-footer">
+        <p>Built with Web Audio, VexFlow, Tone.js, and LLM insights to demonstrate an orchestration-ready agent.</p>
+      </footer>
+    </div>
 
-    <script type="module" src="main.js"></script>
+    <script type="module" src="./src/app.js"></script>
   </body>
 </html>

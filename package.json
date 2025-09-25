@@ -1,10 +1,13 @@
 {
   "name": "song-agent-demo",
-  "version": "1.0.0",
+
+  "version": "1.1.0",
+  "private": true,
   "description": "Song Agent browser demo that records audio, detects pitch, renders sheet music, and provides LLM insights.",
-  "main": "server.js",
+  "type": "module",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test"
   },
   "keywords": [
     "music",
@@ -13,6 +16,5 @@
     "tonejs",
     "demo"
   ],
-  "author": "",
   "license": "MIT"
 }
