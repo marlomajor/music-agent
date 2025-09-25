@@ -17,17 +17,23 @@ This project demonstrates how an agent can coordinate live audio analysis, symbo
 - **Playback** of the detected melody using Tone.js.
 - **LLM explanation** via OpenAI's Chat Completions API (with an offline heuristic fallback when no key is supplied).
 
-## Running the demo
+## Prerequisites
 
-Open `index.html` in a modern browser (Chrome, Edge, or Safari). Because the demo requests microphone access, you will need to serve the files via `https://` or from `http://localhost`.
+- [Node.js](https://nodejs.org/) 18 or newer (npm is bundled with Node).
+- A modern browser (Chrome, Edge, or Safari) with microphone access.
 
-A simple way to do this is to use a local static server, e.g.:
+## Quick start
 
-```bash
-npx serve .
-```
-
-Then navigate to the provided `localhost` URL.
+1. Install dependencies (none are required, but this creates a local `node_modules` directory and ensures npm scripts are available):
+   ```bash
+   npm install
+   ```
+2. Launch the built-in static file server:
+   ```bash
+   npm start
+   ```
+   The app will be available at [http://localhost:3000](http://localhost:3000). You can change the port by setting the `PORT` environment variable before running the command.
+3. Visit the URL in your browser and allow microphone access when prompted.
 
 ## Usage
 
