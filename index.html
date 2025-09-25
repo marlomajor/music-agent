@@ -13,81 +13,101 @@
   </head>
   <body>
     <div class="app-shell">
-      <header class="app-header">
-        <div>
-          <p class="eyebrow">Song Agent</p>
-          <h1>Sing to Sheet Music</h1>
-          <p class="subtitle">Capture a melody, see the notes, and get instant musical insights.</p>
+      <header class="topbar">
+        <div class="brand" aria-label="MusiGrafa">
+          <svg class="brand__logo" width="28" height="28" viewBox="0 0 32 32" aria-hidden="true">
+            <defs>
+              <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+                <stop offset="0" stop-color="#7f52ff"/>
+                <stop offset="1" stop-color="#2dd4ff"/>
+              </linearGradient>
+            </defs>
+            <circle cx="16" cy="16" r="14" fill="url(#g)" opacity="0.25"/>
+            <circle cx="16" cy="16" r="10" fill="none" stroke="url(#g)" stroke-width="2"/>
+            <path d="M12 10v12a5 5 0 1 0 2-4V10z" fill="url(#g)"/>
+          </svg>
+          <span class="brand__text">MusiGrafa</span>
         </div>
-        <div class="status-pill" aria-live="polite">
-          <span id="recordingIndicator" class="status-dot"></span>
-          <span id="statusText">Idle. Ready when you are.</span>
+        <div class="topbar__right">
+          <div class="status-pill" aria-live="polite">
+            <span id="recordingIndicator" class="status-dot"></span>
+            <span id="statusText">Press Record when ready →</span>
+          </div>
+          <div class="top-controls">
+            <button id="recordButton" class="icon-btn" title="Record" aria-label="Record">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="6"/></svg>
+            </button>
+            <button id="stopButton" class="icon-btn" title="Stop" aria-label="Stop" disabled>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>
+            </button>
+            <button id="clearButton" class="icon-btn" title="Reset" aria-label="Reset">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 5v2a5 5 0 1 1-3.535 1.465l1.414 1.414A3 3 0 1 0 15 12V5z"/></svg>
+            </button>
+          </div>
+          <div class="user-badge" role="button" tabindex="0" aria-label="User menu">
+            <span class="user-badge__avatar" aria-hidden="true">MM</span>
+            <span class="user-badge__name">Marlo Major</span>
+            <svg class="user-badge__caret" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 10l5 5 5-5z"/></svg>
+          </div>
         </div>
       </header>
 
-      <main class="grid">
-        <section class="card card--primary">
+      <section class="feedback-layer">
+        <div id="liveFeedback" class="feedback-bubble" aria-live="polite" hidden></div>
+      </section>
+
+      <section class="top-grid">
+        <div class="viz-wrap" aria-hidden="true">
+          <canvas id="wave" width="1100" height="260"></canvas>
+        </div>
+      </section>
+
+      <main class="bottom-grid">
+        <section class="card card--primary compact">
           <header class="card__header">
             <h2>Capture</h2>
             <span id="timer" class="timer">00:00</span>
           </header>
           <p class="card__body">
-            Use your laptop mic to record up to ten seconds. We detect the dominant pitch every 200ms and track a clean melody line.
+            Capture your voice with laptop mic.
           </p>
-          <div class="controls">
-            <button id="recordButton" class="btn btn--accent">Record</button>
-            <button id="stopButton" class="btn" disabled>Stop</button>
-            <button id="clearButton" class="btn btn--ghost">Reset</button>
-          </div>
           <div class="level-meter" aria-hidden="true">
             <div id="levelBar" class="level-meter__bar"></div>
           </div>
           <audio id="recordedAudio" class="audio-preview" controls hidden></audio>
         </section>
 
-        <section class="card">
+        <section class="card compact">
           <header class="card__header">
             <h2>Detected Notes</h2>
           </header>
           <div id="noteList" class="note-chips" aria-live="polite">
-            <p class="empty-state">Record to see the melody evolve in real time.</p>
+            <p class="empty-state">Record to see the melody evolve.</p>
           </div>
         </section>
 
-        <section class="card card--wide">
-          <header class="card__header">
-            <h2>Sheet Music</h2>
-          </header>
-          <div id="sheetContainer" class="sheet-container">
-            <svg id="sheet" role="img" aria-label="Rendered sheet music"></svg>
-          </div>
-        </section>
-
-        <section class="card">
+        <section class="card compact">
           <header class="card__header">
             <h2>Playback</h2>
           </header>
-          <p class="card__body">Preview the detected melody rendered with Tone.js.</p>
+          <p class="card__body">Preview the detected melody rendered.</p>
           <button id="playButton" class="btn btn--accent" disabled>Play Melody</button>
         </section>
 
-        <section class="card card--tall">
+        <section class="card compact">
           <header class="card__header">
-            <h2>LLM Explanation</h2>
+            <h2>Agent Insights</h2>
           </header>
-          <label class="label" for="apiKey">OpenAI API Key (optional)</label>
+          <label class="label" for="apiKey">OpenAI API Key</label>
           <input id="apiKey" class="input" type="password" placeholder="sk-..." autocomplete="off" />
           <button id="analyzeButton" class="btn btn--accent" disabled>Analyze Melody</button>
-          <pre id="llmJson" class="json-output">{"status": "Waiting for analysis"}</pre>
-          <p id="llmExplanation" class="llm-explanation">Add a short melody to receive a key, chords, and style guidance.</p>
         </section>
       </main>
 
-      <footer class="app-footer">
-        <p>Built with Web Audio, VexFlow, Tone.js, and LLM insights to demonstrate an orchestration-ready agent.</p>
-      </footer>
+      <footer class="app-footer"></footer>
     </div>
 
+    <script src="/node_modules/tone/build/Tone.js"></script>
     <script type="module" src="./src/app.js"></script>
   </body>
 </html>

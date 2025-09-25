@@ -1,6 +1,10 @@
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
+import http from 'http';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = __dirname;
@@ -21,13 +25,22 @@ const MIME_TYPES = {
 
 const server = http.createServer((req, res) => {
   const safeSuffix = path.normalize(req.url).replace(/^\/+/, '');
-  let filePath = path.join(PUBLIC_DIR, safeSuffix);
+  let filePath;
+
+  if (req.url.startsWith('/node_modules/')) {
+    filePath = path.join(PUBLIC_DIR, safeSuffix);
+  } else {
+    filePath = path.join(PUBLIC_DIR, safeSuffix);
+  }
 
   if (req.url === '/' || req.url === '') {
     filePath = path.join(PUBLIC_DIR, 'index.html');
   }
 
-  if (!filePath.startsWith(PUBLIC_DIR)) {
+  const allowedPaths = [PUBLIC_DIR, path.join(PUBLIC_DIR, 'node_modules')];
+  const isAllowed = allowedPaths.some(allowedPath => filePath.startsWith(allowedPath));
+  
+  if (!isAllowed) {
     res.writeHead(400, { 'Content-Type': 'text/plain; charset=UTF-8' });
     res.end('Bad request');
     return;
@@ -51,4 +64,4 @@ server.listen(PORT, () => {
   console.log(`Song Agent demo available at http://localhost:${PORT}`);
 });
 
-module.exports = server;
+export default server;

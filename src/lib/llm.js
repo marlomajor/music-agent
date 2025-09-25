@@ -18,6 +18,7 @@ export function summarizeMelody(noteSequence) {
   }
 
   const counts = new Map();
+		
   for (const note of noteSequence) {
     const pitchClass = note.replace(/\d+/g, "");
     counts.set(pitchClass, (counts.get(pitchClass) || 0) + 1);

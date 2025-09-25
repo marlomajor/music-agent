@@ -1,5 +1,3 @@
-import { Factory } from "https://cdn.jsdelivr.net/npm/vexflow@4.2.5/build/esm/vexflow.js";
-import * as Tone from "https://cdn.jsdelivr.net/npm/tone@14.8.55/build/Tone.js";
 import {
   detectPitch,
   frequencyToMidi,
@@ -9,6 +7,9 @@ import {
   calculateRms
 } from "./lib/pitch.js";
 import { summarizeMelody } from "./lib/llm.js";
+
+const Tone = window.Tone;
+console.log("Tone available:", typeof Tone);
 
 const ui = {
   recordButton: document.getElementById("recordButton"),
@@ -21,9 +22,8 @@ const ui = {
   indicator: document.getElementById("recordingIndicator"),
   timer: document.getElementById("timer"),
   noteList: document.getElementById("noteList"),
-  sheet: document.getElementById("sheet"),
-  llmJson: document.getElementById("llmJson"),
   llmExplanation: document.getElementById("llmExplanation"),
+  liveFeedback: document.getElementById("liveFeedback"),
   recordedAudio: document.getElementById("recordedAudio"),
   levelBar: document.getElementById("levelBar")
 };
@@ -41,7 +41,10 @@ const state = {
   recordedChunks: [],
   recordingUrl: null,
   notes: [],
-  isRecording: false
+  isRecording: false,
+  waveCanvas: null,
+  waveCtx: null,
+  waveRAF: null
 };
 
 function setStatus(message, tone = "info") {
@@ -61,20 +64,91 @@ function resetState({ preserveAudio = false } = {}) {
   }
 
   state.notes = [];
-  ui.noteList.innerHTML = '<p class="empty-state">Record to see the melody evolve in real time.</p>';
+  ui.noteList.innerHTML = '<p class="empty-state">Record to see the melody evolve.</p>';
   ui.playButton.disabled = true;
   ui.analyzeButton.disabled = true;
-  ui.llmJson.textContent = '{"status": "Waiting for analysis"}';
-  ui.llmExplanation.textContent = "Add a short melody to receive a key, chords, and style guidance.";
+  if (ui.llmExplanation) {
+    ui.llmExplanation.textContent = "";
+  }
   ui.timer.textContent = "00:00";
   updateLevelMeter(0);
-  clearSheetMusic();
-  setStatus("Idle. Ready when you are.");
+  setStatus("Press Record when ready →");
 }
 
 function updateLevelMeter(level) {
   const clamped = Math.min(Math.max(level, 0), 1);
   ui.levelBar.style.transform = `scaleX(${clamped})`;
+}
+
+function initWaveCanvas() {
+  if (!state.waveCanvas) {
+    state.waveCanvas = document.getElementById("wave");
+    state.waveCtx = state.waveCanvas ? state.waveCanvas.getContext("2d") : null;
+    if (state.waveCanvas) {
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      const cssWidth = state.waveCanvas.clientWidth || state.waveCanvas.width;
+      const cssHeight = state.waveCanvas.clientHeight || state.waveCanvas.height;
+      state.waveCanvas.width = Math.floor(cssWidth * dpr);
+      state.waveCanvas.height = Math.floor(cssHeight * dpr);
+      if (state.waveCtx) state.waveCtx.scale(dpr, dpr);
+    }
+  }
+}
+
+function clearWave() {
+  if (!state.waveCtx || !state.waveCanvas) return;
+  state.waveCtx.clearRect(0, 0, state.waveCanvas.width, state.waveCanvas.height);
+}
+
+function startVisualizer(analyser) {
+  initWaveCanvas();
+  const ctx = state.waveCtx;
+  const canvas = state.waveCanvas;
+  if (!ctx || !canvas) return;
+
+  const data = new Uint8Array(analyser.fftSize);
+  const w = canvas.width;
+  const h = canvas.height;
+
+  const barWidth = 6;
+  const gap = 4;
+  const step = barWidth + gap;
+  const centerY = h / 2;
+
+  const grad = ctx.createLinearGradient(0, 0, w, 0);
+  grad.addColorStop(0.00, "#ff3b30");
+  grad.addColorStop(0.30, "#ff2d92");
+  grad.addColorStop(0.50, "#7f52ff");
+  grad.addColorStop(0.70, "#ff2d92");
+  grad.addColorStop(1.00, "#ff3b30");
+
+  function draw() {
+    state.waveRAF = requestAnimationFrame(draw);
+    analyser.getByteTimeDomainData(data);
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = grad;
+
+    const bars = Math.floor(w / step);
+    const slice = Math.max(1, Math.floor(data.length / bars));
+
+    for (let i = 0; i < bars; i++) {
+      const v = data[i * slice] / 128 - 1; // -1..1
+      const amp = Math.abs(v);
+      const barHeight = Math.max(6, amp * (h * 0.9));
+      const x = i * step + gap / 2;
+      ctx.fillRect(x, centerY - barHeight / 2, barWidth, barHeight);
+    }
+  }
+
+  draw();
+}
+
+function stopVisualizer() {
+  if (state.waveRAF) {
+    cancelAnimationFrame(state.waveRAF);
+    state.waveRAF = null;
+  }
+  clearWave();
 }
 
 function updateTimer() {
@@ -111,10 +185,19 @@ async function startRecording() {
   ui.clearButton.disabled = true;
 
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true },
-      video: false
-    });
+    // Prefer rich constraints; gracefully fall back if unsupported
+    const tryGetStream = async () => {
+      try {
+        return await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          video: false
+        });
+      } catch (err) {
+        // Overconstrained on some browsers; fall back
+        return await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
+    };
+    const stream = await tryGetStream();
 
     resetState();
 
@@ -163,6 +246,9 @@ async function startRecording() {
     state.isRecording = true;
     state.recordingStart = performance.now();
 
+    // start waveform visualizer
+    startVisualizer(analyser);
+
     if (state.autoStopTimeout) {
       clearTimeout(state.autoStopTimeout);
     }
@@ -183,7 +269,7 @@ async function startRecording() {
       const rms = calculateRms(buffer) * 3.2;
       updateLevelMeter(Math.min(rms, 1));
 
-      if (!frequency || clarity < 0.58) {
+      if (!frequency || clarity < 0.4) {
         return;
       }
 
@@ -199,14 +285,35 @@ async function startRecording() {
 
       const timestamp = Number((audioContext.currentTime).toFixed(2));
       const previous = state.notes[state.notes.length - 1];
-      if (!previous || previous.midi !== note.midi) {
+      if (!previous || previous.midi !== note.midi || Math.abs(timestamp - previous.timestamp) > 0.4) {
         state.notes.push({ ...note, frequency, clarity, timestamp });
+        // Keep more history for better rendering
+        if (state.notes.length > 40) state.notes.shift();
         renderNoteList();
       }
     }, 200);
   } catch (error) {
-    console.error(error);
-    setStatus("Microphone permission denied. Please allow access and try again.", "error");
+    console.error("Microphone error:", error);
+    let message = "Unable to start microphone. Check browser permissions and refresh.";
+    if (error?.name === "NotAllowedError") message = "Microphone permission denied. Allow access and try again.";
+    else if (error?.name === "NotFoundError") message = "No microphone available. Plug one in or select a different input.";
+    else if (error?.name === "NotReadableError") message = "Microphone is in use by another application. Close it and retry.";
+    else if (error?.name === "SecurityError") message = "Microphone requires a secure context (https or localhost).";
+    else if (error?.name === "OverconstrainedError") message = "Microphone constraints not supported. Falling back failed.";
+    setStatus(message, "error");
+
+    // Extra diagnostics to console
+    try {
+      if (navigator.permissions?.query) {
+        const p = await navigator.permissions.query({ name: "microphone" });
+        console.warn("permissions.microphone:", p.state);
+      }
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const mics = devices.filter(d => d.kind === "audioinput");
+      console.warn("audio inputs:", mics.map(m => ({ label: m.label, id: m.deviceId })));
+    } catch (diagErr) {
+      console.warn("mic diagnostics error:", diagErr);
+    }
     cleanupRecording();
   } finally {
     ui.recordButton.disabled = state.isRecording;
@@ -252,6 +359,7 @@ function stopRecording() {
   state.isRecording = false;
   toggleRecordingIndicator(false);
   updateLevelMeter(0);
+  stopVisualizer();
 
   state.notes = mergeNotes(state.notes);
 
@@ -259,7 +367,6 @@ function stopRecording() {
     setStatus("Recording captured. Preview your melody below.", "success");
     ui.playButton.disabled = false;
     ui.analyzeButton.disabled = false;
-    renderSheetMusic();
   } else {
     setStatus("No stable pitch detected. Try a clearer hum.", "warning");
     ui.noteList.innerHTML = '<p class="empty-state">Try again with a steady pitch.</p>';
@@ -306,6 +413,7 @@ function cleanupRecording() {
   state.isRecording = false;
   toggleRecordingIndicator(false);
   updateLevelMeter(0);
+  stopVisualizer();
   ui.recordButton.disabled = false;
   ui.stopButton.disabled = true;
 }
@@ -342,42 +450,6 @@ function renderNoteList() {
   ui.noteList.appendChild(fragment);
 }
 
-function clearSheetMusic() {
-  if (ui.sheet) {
-    ui.sheet.innerHTML = "";
-  }
-}
-
-function renderSheetMusic() {
-  clearSheetMusic();
-  if (!state.notes.length) {
-    return;
-  }
-
-  const width = Math.max(420, state.notes.length * 70);
-  const height = 220;
-  const factory = new Factory({ renderer: { elementId: "sheet", width, height } });
-  const score = factory.EasyScore();
-  const system = factory.System();
-
-  const vexNotes = state.notes
-    .map((note) => {
-      const key = `${note.name.toLowerCase().replace("#", "#")}/${note.octave}`;
-      return `${key}/q`;
-    })
-    .join(", ");
-
-  system
-    .addStave({
-      voices: [
-        score.voice(score.notes(vexNotes || "b/4/q", { stem: "up" }))
-      ]
-    })
-    .addClef("treble")
-    .addTimeSignature("4/4");
-
-  factory.draw();
-}
 
 async function playMelody() {
   if (!state.notes.length) {
@@ -406,8 +478,9 @@ async function analyzeMelody() {
   }
 
   ui.analyzeButton.disabled = true;
-  ui.llmJson.textContent = "Analyzing...";
-  ui.llmExplanation.textContent = "Contacting the language model...";
+  if (ui.llmExplanation) {
+    ui.llmExplanation.textContent = "Contacting the language model...";
+  }
 
   const apiKey = ui.apiKey.value.trim();
   const noteSequence = state.notes.map((note) => formatNote(note));
@@ -425,9 +498,17 @@ async function analyzeMelody() {
     }
   }
 
-  ui.llmJson.textContent = JSON.stringify(payload, null, 2);
-  ui.llmExplanation.textContent = payload.explanation;
+  // Don't show in card; only show popup
   ui.analyzeButton.disabled = false;
+  // Show popup bubble above the synthwave
+  if (ui.liveFeedback) {
+    if (payload?.explanation) {
+      ui.liveFeedback.textContent = payload.explanation;
+      ui.liveFeedback.hidden = false;
+    } else {
+      ui.liveFeedback.hidden = true;
+    }
+  }
 }
 
 async function callOpenAI(apiKey, noteSequence) {
@@ -461,11 +542,12 @@ async function callOpenAI(apiKey, noteSequence) {
   }
 
   const data = await response.json();
-  if (!data.choices?.length) {
-    throw new Error("No choices returned from OpenAI API");
+  const text = data?.choices?.[0]?.message?.content || "{}";
+  try {
+    return JSON.parse(text);
+  } catch (_e) {
+    return summarizeMelody(noteSequence);
   }
-
-  return JSON.parse(data.choices[0].message.content);
 }
 
 function bindEvents() {
