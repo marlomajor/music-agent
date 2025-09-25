@@ -58,6 +58,7 @@ async function startRecording() {
 
   audioContext = new (window.AudioContext || window.webkitAudioContext)();
   await audioContext.resume();
+
   analyserNode = audioContext.createAnalyser();
   analyserNode.fftSize = 2048;
 
@@ -73,7 +74,9 @@ async function startRecording() {
 
   detectionInterval = setInterval(() => {
     analyserNode.getFloatTimeDomainData(dataArray);
+
     const { frequency: pitch, clarity } = detectPitch(dataArray, audioContext.sampleRate);
+
 
     if (!pitch || Number.isNaN(pitch) || pitch < 60 || pitch > 1400) {
       return;
