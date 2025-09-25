@@ -1,6 +1,5 @@
 import { Factory } from "https://cdn.jsdelivr.net/npm/vexflow@4.2.4/build/esm/vexflow.js";
 import * as Tone from "https://cdn.jsdelivr.net/npm/tone@14.8.55/build/Tone.js";
-import { PitchDetector } from "https://cdn.jsdelivr.net/npm/pitchy@4.0.0/dist/index.esm.js";
 
 const recordButton = document.getElementById("recordButton");
 const stopButton = document.getElementById("stopButton");
@@ -15,7 +14,6 @@ const llmExplanationEl = document.getElementById("llmExplanation");
 let audioContext;
 let analyserNode;
 let mediaStream;
-let detector;
 let dataArray;
 let detectionInterval;
 let recordingStartTime = 0;
@@ -45,6 +43,11 @@ async function startRecording() {
 
   resetState();
 
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    statusEl.textContent = "Microphone access is not supported in this browser.";
+    return;
+  }
+
   try {
     mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
   } catch (error) {
@@ -54,13 +57,14 @@ async function startRecording() {
   }
 
   audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  await audioContext.resume();
+
   analyserNode = audioContext.createAnalyser();
   analyserNode.fftSize = 2048;
 
   const source = audioContext.createMediaStreamSource(mediaStream);
   source.connect(analyserNode);
 
-  detector = PitchDetector.forFloat32Array(analyserNode.fftSize);
   dataArray = new Float32Array(analyserNode.fftSize);
   recordingStartTime = audioContext.currentTime;
 
@@ -70,13 +74,15 @@ async function startRecording() {
 
   detectionInterval = setInterval(() => {
     analyserNode.getFloatTimeDomainData(dataArray);
-    const [pitch, clarity] = detector.findPitch(dataArray, audioContext.sampleRate);
+
+    const { frequency: pitch, clarity } = detectPitch(dataArray, audioContext.sampleRate);
+
 
     if (!pitch || Number.isNaN(pitch) || pitch < 60 || pitch > 1400) {
       return;
     }
 
-    if (clarity < 0.9) {
+    if (clarity < 0.6) {
       return;
     }
 
@@ -201,7 +207,7 @@ async function playMelody() {
   const step = 0.5;
 
   collectedNotes.forEach((note, index) => {
-    const toneNote = `${note.name.replace("#", "#")}${note.octave}`;
+    const toneNote = Tone.Frequency(note.midi, "midi").toNote();
     synth.triggerAttackRelease(toneNote, "8n", now + index * step);
   });
 }
@@ -333,4 +339,92 @@ function midiToNote(midi) {
 
 function toVexKey(name, octave) {
   return `${name.toLowerCase().replace("#", "#")}/${octave}`;
+}
+
+function detectPitch(buffer, sampleRate) {
+  const SIZE = buffer.length;
+  let sum = 0;
+  for (let i = 0; i < SIZE; i++) {
+    const value = buffer[i];
+    sum += value * value;
+  }
+
+  const rootMeanSquare = Math.sqrt(sum / SIZE);
+  if (rootMeanSquare < 0.01) {
+    return { frequency: null, clarity: 0 };
+  }
+
+  let r1 = 0;
+  let r2 = SIZE - 1;
+  const threshold = 0.2;
+
+  while (r1 < SIZE / 2 && Math.abs(buffer[r1]) < threshold) {
+    r1++;
+  }
+
+  while (r2 > SIZE / 2 && Math.abs(buffer[r2]) < threshold) {
+    r2--;
+  }
+
+  const trimmed = buffer.slice(r1, r2);
+  const trimmedSize = trimmed.length;
+
+  if (trimmedSize < 2) {
+    return { frequency: null, clarity: 0 };
+  }
+
+  const autocorrelation = new Float32Array(trimmedSize).fill(0);
+  for (let lag = 0; lag < trimmedSize; lag++) {
+    let correlation = 0;
+    for (let i = 0; i < trimmedSize - lag; i++) {
+      correlation += trimmed[i] * trimmed[i + lag];
+    }
+    autocorrelation[lag] = correlation;
+  }
+
+  let d = 0;
+  while (d < trimmedSize - 1 && autocorrelation[d] > autocorrelation[d + 1]) {
+    d++;
+  }
+
+  let maxPos = -1;
+  let maxVal = -1;
+  for (let i = d; i < trimmedSize; i++) {
+    if (autocorrelation[i] > maxVal) {
+      maxVal = autocorrelation[i];
+      maxPos = i;
+    }
+  }
+
+  if (maxPos <= 0) {
+    return { frequency: null, clarity: 0 };
+  }
+
+  let betterPeriod = maxPos;
+  if (maxPos > 0 && maxPos < trimmedSize - 1) {
+    const left = autocorrelation[maxPos - 1];
+    const center = autocorrelation[maxPos];
+    const right = autocorrelation[maxPos + 1];
+    const divisor = 2 * center - left - right;
+    if (divisor !== 0) {
+      betterPeriod = maxPos + (right - left) / (2 * divisor);
+    }
+  }
+
+  if (!betterPeriod || Number.isNaN(betterPeriod)) {
+    return { frequency: null, clarity: 0 };
+  }
+
+  const frequency = sampleRate / betterPeriod;
+  const reference = autocorrelation[0];
+  if (reference === 0) {
+    return { frequency: null, clarity: 0 };
+  }
+  const clarity = maxVal / reference;
+
+  if (frequency < 20 || frequency > 2000) {
+    return { frequency: null, clarity: 0 };
+  }
+
+  return { frequency, clarity };
 }
